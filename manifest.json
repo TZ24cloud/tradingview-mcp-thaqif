@@ -2,7 +2,7 @@
   "manifest_version": "0.2",
   "name": "tradingview-mcp-thaqif",
   "display_name": "TradingView MCP (Thaqif)",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "Bridge TradingView Desktop to Claude for Pine Script, FCPO/futures, and Wyckoff multi-timeframe analysis.",
   "long_description": "A local MCP server that connects to your running TradingView Desktop app via the Chrome DevTools Protocol. Read chart state, indicator values, and custom Pine output; develop and compile Pine Script v5/v6; manage alerts; and run a Wyckoff multi-timeframe morning brief driven by your rules.json. Requires your own valid TradingView subscription. No autonomous trade execution.",
   "author": {

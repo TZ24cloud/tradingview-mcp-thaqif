@@ -6,6 +6,15 @@ The format follows [Keep a Changelog](https://keepachangelog.com/), and the rule
 
 ---
 
+## [2.0.1] - 2026-05-30
+
+### Added
+- Published to the official MCP Registry as io.github.TZ24cloud/tradingview-mcp-thaqif.
+- Added mcpName in package.json and a registry server.json for package-ownership verification.
+
+### Changed
+- Trimmed the registry description to the 100-character limit.
+
 ## [2.0.0] - 2026-05-30
 
 Complete restructure from a single-strategy config into a reusable Pine Script / FCPO development ruleset for AI-assisted trading systems. This is a breaking change to the file shape (new top-level keys), hence the major version bump.
