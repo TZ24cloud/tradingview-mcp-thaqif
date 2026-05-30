@@ -33,3 +33,6 @@ tmp/
 .cache/
 
 # Keep rules.json and example .pine files tracked (do not ignore them)
+
+# Built Desktop Extension bundle (attach to Releases instead)
+*.mcpb

@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    name: Build & hermetic tests
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: [ '18', '20', '22' ]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Syntax-check all sources
+        run: |
+          find src scripts -type f \( -name '*.js' -o -name '*.cjs' \) -print0 \
+            | xargs -0 -I{} node --check {}
+
+      # Only the hermetic unit suite runs in CI.
+      # tests/e2e.test.js needs a live TradingView Desktop on CDP port 9222.
+      # tests/cli.test.js shells out to the CLI and is not headless-safe.
+      - name: Unit tests (hermetic - no live TradingView)
+        run: node --test tests/pine_analyze.test.js

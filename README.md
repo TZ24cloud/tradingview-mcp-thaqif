@@ -2,6 +2,8 @@
 
 **Drive TradingView Desktop from Claude (and other MCP clients) for Pine Script v5/v6, FCPO/futures, and Wyckoff multi-timeframe analysis.**
 
+[![CI](https://github.com/TZ24cloud/tradingview-mcp-thaqif/actions/workflows/ci.yml/badge.svg)](https://github.com/TZ24cloud/tradingview-mcp-thaqif/actions/workflows/ci.yml) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE) [![npm version](https://img.shields.io/npm/v/tradingview-mcp-thaqif.svg)](https://www.npmjs.com/package/tradingview-mcp-thaqif)
+
 A local MCP server that bridges TradingView Desktop to an AI assistant over the Chrome DevTools Protocol, shipped with a 64-rule `rules.json` that constrains how the AI writes Pine and reads the market. MIT-licensed, runs entirely on your machine.
 
 > Improved fork of [tradingview-mcp-jackson](https://github.com/LewisWJackson/tradingview-mcp-jackson) by Lewis W. Jackson, itself built on the original [tradingview-mcp](https://github.com/tradesdontlie/tradingview-mcp) by [@tradesdontlie](https://github.com/tradesdontlie). Full credit to both — see [NOTICE](NOTICE).
