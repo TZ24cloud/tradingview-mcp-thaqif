@@ -1,0 +1,530 @@
+{
+  "meta": {
+    "name": "tradingview-mcp-thaqif",
+    "version": "2.0.0",
+    "author": "Thaqif",
+    "description": "Improved TradingView MCP rules for Pine Script v5/v6 development, FCPO/futures trading indicators, and AI-assisted trading systems.",
+    "based_on": "LewisWJackson/tradingview-mcp-jackson (rules.json v1)",
+    "last_updated": "2026-05-30",
+    "pine_version_target": "v6 (backward-compatible patterns flagged for v5)",
+    "rule_format": "Each rule is an object: { id, rule, rationale, severity, example?, anti_example? }. Severity is one of: critical, high, medium, low. JSON has no native comments, so rationale/example fields carry the explanation.",
+    "how_to_use": "Load this file as the project rules/context for an AI coding assistant (Claude + TradingView MCP). Treat 'critical' and 'high' rules as hard constraints during Pine Script generation and review."
+  },
+
+  "trading_context": {
+    "primary_instruments": [
+      "FCPO — Bursa Malaysia Crude Palm Oil Futures (TradingView: MYX:FCPO1! continuous front month; 25 metric tons/contract; tick = RM1/ton = RM25/contract; quoted in MYR per metric ton)",
+      "Crude oil — WTI (NYMEX:CL1!) and Brent (ICEEUR:BRN1!)",
+      "BTCUSDT — retained from v1 for the scalper demo profile"
+    ],
+    "methodology": [
+      "Wyckoff (accumulation, markup, distribution, markdown; events PS/SC/AR/ST/Spring/SOS/LPS/UTAD/SOW/LPSY)",
+      "Multi-timeframe top-down (Daily bias -> H4 structure -> H1 zone -> M15 trigger)",
+      "Effort vs Result via volume confirmation",
+      "Fibonacci confluence (0.382, 0.5, 0.618, 0.705, 0.786)"
+    ],
+    "default_signal_timeframe": "15",
+    "analysis_timeframes": ["D", "240", "60", "15"],
+    "fcpo_external_drivers": [
+      "Dalian palm olein (DCE) lead/lag",
+      "CBOT soybean oil ZL/BO (substitute edible oil)",
+      "Brent/WTI crude (palm as biodiesel feedstock)",
+      "USD/MYR (export competitiveness)",
+      "MPOB monthly data (production, exports, closing stocks/inventory)",
+      "SGS / AmSpec / ITS export cargo surveys",
+      "Indonesia export levy/DMO policy"
+    ],
+    "fcpo_sessions_myt_gmt8": [
+      "Pre-open auction ~10:00-10:30 (avoid signals)",
+      "Morning session 10:30-12:30",
+      "Lunch break 12:30-14:30 (no trading; beware gap on reopen)",
+      "Afternoon session 14:30-18:00"
+    ]
+  },
+
+  "categories": {
+    "pine_script": {
+      "description": "Core Pine Script v5/v6 coding standards. These govern how indicators, strategies, and libraries are written so they compile cleanly, do not repaint, and stay maintainable.",
+      "rules": [
+        {
+          "id": "ps-001",
+          "rule": "Declare the Pine version on the very first line with //@version=6 (use //@version=5 only when a dependency forces it).",
+          "rationale": "The version annotation must precede all code or the script fails to compile. v6 fixes type/na inconsistencies and allows request.* in local scopes.",
+          "severity": "critical",
+          "example": "//@version=6\nindicator(\"FCPO MTF Bias\", overlay=true)"
+        },
+        {
+          "id": "ps-002",
+          "rule": "Use exactly one declaration statement (indicator(), strategy(), or library()) and set overlay explicitly.",
+          "rationale": "Implicit overlay leads to plots landing in the wrong pane. Explicit overlay=true/false documents intent.",
+          "severity": "high"
+        },
+        {
+          "id": "ps-003",
+          "rule": "Always use namespaced built-ins: ta.*, math.*, str.*, array.*, matrix.*, request.*, input.*, color.*, strategy.*.",
+          "rationale": "Un-namespaced v3/v4 calls (sma, rsi, security) are removed in v5/v6 and break compilation.",
+          "severity": "critical",
+          "anti_example": "r = rsi(close, 14)",
+          "example": "r = ta.rsi(close, 14)"
+        },
+        {
+          "id": "ps-004",
+          "rule": "Define all user inputs through input.* (input.int, input.float, input.bool, input.source, input.timeframe, input.session, input.string) with title, defval, and group/tooltip.",
+          "rationale": "Typed inputs give validation, grouped settings UI, and self-documenting tooltips.",
+          "severity": "medium",
+          "example": "len = input.int(14, \"RSI Length\", minval=2, group=\"Momentum\", tooltip=\"Lookback for RSI\")"
+        },
+        {
+          "id": "ps-005",
+          "rule": "Initialize state that must persist across bars with var (or varip only for intrabar counters), never by reassigning a fresh value every bar.",
+          "rationale": "var initializes once; plain assignment resets each bar and loses accumulated state.",
+          "severity": "high",
+          "example": "var int tradeCount = 0"
+        },
+        {
+          "id": "ps-006",
+          "rule": "Guard division, sqrt, log, and array access against na and zero; prefer nz() and explicit bounds checks.",
+          "rationale": "na or divide-by-zero silently produces na series that propagate and blank out plots.",
+          "severity": "high",
+          "example": "ratio = den != 0 ? num / den : na"
+        },
+        {
+          "id": "ps-007",
+          "rule": "Declare max_bars_back, max_lines_count, max_labels_count, and max_boxes_count when referencing deep history or drawing many objects.",
+          "rationale": "Default limits (~50 drawings, dynamic bars_back) cause runtime errors or dropped drawings on busy charts.",
+          "severity": "medium",
+          "example": "indicator(\"Wyckoff Events\", overlay=true, max_labels_count=500, max_lines_count=500)"
+        },
+        {
+          "id": "ps-008",
+          "rule": "Keep per-bar work O(1) where possible; precompute series once and avoid recomputing inside for/while loops on every bar.",
+          "rationale": "Heavy loops each bar hit the execution-time limit and slow the chart.",
+          "severity": "medium"
+        },
+        {
+          "id": "ps-009",
+          "rule": "Use request.security() for higher-timeframe data with lookahead=barmerge.lookahead_off and gaps=barmerge.gaps_off, and never read the live HTF bar for a signal.",
+          "rationale": "Reading an unconfirmed HTF bar is the #1 cause of repainting.",
+          "severity": "critical"
+        },
+        {
+          "id": "ps-010",
+          "rule": "Comment non-obvious logic with single-line // comments, and structure files top-down: version, declaration, inputs, calculations, signals, plots/alerts.",
+          "rationale": "A consistent layout makes scripts reviewable and diffable across versions.",
+          "severity": "low"
+        },
+        {
+          "id": "ps-011",
+          "rule": "Prefer if/switch expression-assignment (v6) over nested ternaries longer than two levels.",
+          "rationale": "v6 lets if/switch return values, which is far more readable than chained ?: and avoids precedence bugs.",
+          "severity": "low",
+          "example": "bias = switch\n    d > 0 => \"Long\"\n    d < 0 => \"Short\"\n    => \"Neutral\""
+        },
+        {
+          "id": "ps-012",
+          "rule": "Plot with explicit titles and display arguments (plot, plotshape, plotchar, hline, bgcolor, fill, label.new, line.new, box.new); never leave plots untitled.",
+          "rationale": "Titled plots are addressable by the MCP data_get_study_values tool and by alerts/exports.",
+          "severity": "medium"
+        }
+      ]
+    },
+
+    "indicators": {
+      "description": "Standards for indicator selection, calculation, and combination. Avoid redundant, correlated signals and prefer volume/volatility-aware confirmation.",
+      "rules": [
+        {
+          "id": "ind-001",
+          "rule": "Use RSI(14) as a momentum filter, not a standalone trigger; only act when RSI is between 30 and 70 unless the strategy explicitly trades exhaustion.",
+          "rationale": "Carried over and formalized from v1 — extremes are mean-reversion zones, not trend-continuation entries.",
+          "severity": "medium"
+        },
+        {
+          "id": "ind-002",
+          "rule": "Confirm price moves with volume (Effort vs Result): rising price on rising volume = valid; rising price on falling volume = suspect.",
+          "rationale": "Core Wyckoff law; divergence between effort (volume) and result (price) flags weakness.",
+          "severity": "high"
+        },
+        {
+          "id": "ind-003",
+          "rule": "Use ATR (14) for volatility-normalized stops and targets instead of fixed point distances.",
+          "rationale": "FCPO and crude volatility shifts by session and regime; fixed stops are too tight in expansion and too wide in contraction.",
+          "severity": "high",
+          "example": "atr = ta.atr(14)\nstopLong = close - 1.5 * atr"
+        },
+        {
+          "id": "ind-004",
+          "rule": "Anchor VWAP to the session for intraday FCPO/crude work using ta.vwap with a session-reset condition.",
+          "rationale": "Session-anchored VWAP marks fair value for the active session and aligns with composite-man accumulation/distribution.",
+          "severity": "medium"
+        },
+        {
+          "id": "ind-005",
+          "rule": "Do not stack multiple highly-correlated momentum oscillators (e.g., RSI + Stoch + CCI) as independent confirmations.",
+          "rationale": "Correlated indicators create false confidence; they confirm each other, not the market.",
+          "severity": "medium"
+        },
+        {
+          "id": "ind-006",
+          "rule": "When detecting divergence, compare confirmed pivots (ta.pivothigh/ta.pivotlow) not raw highs/lows, and require pivot confirmation before signaling.",
+          "rationale": "Unconfirmed pivots repaint as new bars form.",
+          "severity": "high"
+        },
+        {
+          "id": "ind-007",
+          "rule": "Expose every signal-relevant value as a titled plot or a plot(display=display.data_window) so the MCP can read it via data_get_study_values.",
+          "rationale": "AI-assisted review depends on machine-readable indicator output.",
+          "severity": "medium"
+        }
+      ]
+    },
+
+    "multi_timeframe": {
+      "description": "Top-down multi-timeframe alignment rules (Daily -> H4 -> H1 -> M15) with non-repainting HTF retrieval.",
+      "rules": [
+        {
+          "id": "mtf-001",
+          "rule": "Establish directional bias on the higher timeframe first (Daily/H4), then refine structure on H1, then time entries on M15. Do not take M15 signals against the Daily/H4 bias.",
+          "rationale": "Trade only in the direction of least resistance (Wyckoff). Counter-trend M15 entries fight the dominant force.",
+          "severity": "high"
+        },
+        {
+          "id": "mtf-002",
+          "rule": "Retrieve non-repainting HTF values with the confirmed-bar pattern: request.security(sym, htf, expr[1], lookahead=barmerge.lookahead_on).",
+          "rationale": "Using expr[1] with lookahead_on returns the last CLOSED HTF value on every chart bar — no future leak, no repaint.",
+          "severity": "critical",
+          "example": "f_htf(_src, _tf) => request.security(syminfo.tickerid, _tf, _src[1], lookahead=barmerge.lookahead_on)\nhtfTrend = f_htf(ta.ema(close, 50), \"240\")"
+        },
+        {
+          "id": "mtf-003",
+          "rule": "Use input.timeframe() for HTF parameters and validate that the requested timeframe is higher than the chart timeframe (timeframe.in_seconds()).",
+          "rationale": "Requesting a lower TF than the chart can introduce intrabar lookahead and confusing results.",
+          "severity": "medium"
+        },
+        {
+          "id": "mtf-004",
+          "rule": "Place entries at Fibonacci confluence (0.382/0.5/0.618/0.705/0.786) of the HTF impulse leg, prioritizing zones where a Fib level overlaps a Wyckoff event (Spring/LPS or UTAD/LPSY).",
+          "rationale": "Confluence of structure + Fib + volume raises the probability of the zone holding.",
+          "severity": "medium"
+        },
+        {
+          "id": "mtf-005",
+          "rule": "For intrabar detail use request.security_lower_tf() rather than guessing intrabar movement from the chart timeframe.",
+          "rationale": "security_lower_tf returns an array of lower-TF values per bar, the supported way to inspect intrabar action.",
+          "severity": "low"
+        }
+      ]
+    },
+
+    "wyckoff": {
+      "description": "Codifying Wyckoff method analysis into Pine Script: phase identification, event labeling, and composite-man logic. Distribusi = Distribution (bearish); Akumulasi = Accumulation (bullish).",
+      "rules": [
+        {
+          "id": "wyk-001",
+          "rule": "Label the four phases explicitly (Accumulation, Markup, Distribution, Markdown) and never enter during the range/cause phase — wait for the breakout/breakdown (effect).",
+          "rationale": "Law of Cause and Effect: the size of the range determines the move; entering mid-range has poor R:R.",
+          "severity": "high"
+        },
+        {
+          "id": "wyk-002",
+          "rule": "Detect a Spring as a false break below range support that closes back inside on a wide-spread bar, ideally with a volume spike, and treat it as a primary long trigger.",
+          "rationale": "Spring traps bears and marks Last Point of Support territory — a best-quality long per the methodology.",
+          "severity": "high",
+          "example": "spring = low < support and close > support and ta.highest(volume,20) == volume"
+        },
+        {
+          "id": "wyk-003",
+          "rule": "Detect a UTAD (Upthrust After Distribution) as a false break above range resistance that closes back inside, and treat it as a primary short trigger.",
+          "rationale": "UTAD traps bulls at the top of distribution — the mirror of a Spring.",
+          "severity": "high"
+        },
+        {
+          "id": "wyk-004",
+          "rule": "Classify climactic bars (SC/BC) as wide-spread + very high volume + close in the lower/upper third; require an Automatic Rally/Reaction (AR) before assuming a range has formed.",
+          "rationale": "A single climax is not a range; the AR defines the opposite boundary.",
+          "severity": "medium"
+        },
+        {
+          "id": "wyk-005",
+          "rule": "Apply the price-volume truth table in signal logic: UP+VolUp=strong demand; UP+VolDown=weak rally; DOWN+VolUp=strong supply; DOWN+VolDown=weak selling; narrow spread + high vol = absorption/churn.",
+          "rationale": "This table is the operational core of Effort vs Result and should gate every breakout signal.",
+          "severity": "high"
+        },
+        {
+          "id": "wyk-006",
+          "rule": "Frame every setup with the composite-man question: what is smart money doing here, and where are retail traders trapped?",
+          "rationale": "Keeps logic aligned with accumulation-at-lows / distribution-at-highs rather than chasing.",
+          "severity": "medium"
+        },
+        {
+          "id": "wyk-007",
+          "rule": "Set Wyckoff-consistent stops: for longs, below the Spring low; for shorts, above the UTAD high.",
+          "rationale": "These are the invalidation points where the trap thesis is proven wrong.",
+          "severity": "high"
+        }
+      ]
+    },
+
+    "fcpo": {
+      "description": "FCPO / crude-oil specific development patterns: session gating, contract maths, and inter-market context.",
+      "rules": [
+        {
+          "id": "fcpo-001",
+          "rule": "Gate intraday signals to liquid FCPO sessions using input.session and time(); suppress signals during the pre-open auction, the 12:30-14:30 lunch break, and the first 1-2 bars after the afternoon reopen.",
+          "rationale": "Auction and reopen bars are thin and gap-prone, producing false breakouts.",
+          "severity": "high",
+          "example": "inSess = not na(time(timeframe.period, \"1030-1230,1430-1800\", \"Asia/Kuala_Lumpur\"))"
+        },
+        {
+          "id": "fcpo-002",
+          "rule": "Compute FCPO P&L with the real contract spec: 25 metric tons/contract, tick = RM1/ton = RM25/contract. Convert price-distance stops to ringgit risk before sizing.",
+          "rationale": "Position sizing in lots is wrong unless tick value is modeled; 1 point move = RM25 per lot.",
+          "severity": "critical",
+          "example": "riskRM = math.abs(entry - stop) * 25  // RM per 1 lot"
+        },
+        {
+          "id": "fcpo-003",
+          "rule": "Treat Dalian palm olein and CBOT soybean oil (ZL) as lead/context markets; when building bias indicators, allow an optional request.security() pull of a correlated symbol for confirmation.",
+          "rationale": "FCPO frequently follows the Asian Dalian session and tracks the broader edible-oil complex.",
+          "severity": "medium"
+        },
+        {
+          "id": "fcpo-004",
+          "rule": "Flag MPOB report days and major export-survey releases (SGS/AmSpec/ITS) as elevated-volatility windows; widen stops or stand aside around them via a date/session input.",
+          "rationale": "Inventory and export prints drive gap risk that mechanical stops cannot absorb.",
+          "severity": "medium"
+        },
+        {
+          "id": "fcpo-005",
+          "rule": "Incorporate USD/MYR direction as a slow macro filter for multi-day FCPO bias (stronger USD/MYR generally supports export demand).",
+          "rationale": "Currency competitiveness is a persistent driver of palm export flows.",
+          "severity": "low"
+        },
+        {
+          "id": "fcpo-006",
+          "rule": "Account for the lunch-break gap: do not carry an intrabar stop assuming continuous fills across 12:30-14:30, and re-evaluate structure on the reopen.",
+          "rationale": "FCPO is not continuous; the midday gap can jump a resting stop.",
+          "severity": "high"
+        }
+      ]
+    },
+
+    "backtesting": {
+      "description": "Rules for building honest, robust strategy backtests in Pine Script that survive out-of-sample and live trading.",
+      "rules": [
+        {
+          "id": "bt-001",
+          "rule": "Set process_orders_on_close=true (or fill on the next bar open) so signals do not fill at the same bar they are computed on.",
+          "rationale": "Same-bar fills assume you acted before the bar closed — a classic look-ahead inflation of results.",
+          "severity": "critical",
+          "example": "strategy(\"FCPO Wyckoff\", overlay=true, process_orders_on_close=true, calc_on_every_tick=false)"
+        },
+        {
+          "id": "bt-002",
+          "rule": "Model realistic costs: set commission_type/commission_value and slippage to your broker's FCPO round-turn brokerage and typical slippage; never backtest at zero cost.",
+          "rationale": "Scalping and high-frequency edges usually vanish once real costs are applied.",
+          "severity": "critical"
+        },
+        {
+          "id": "bt-003",
+          "rule": "Keep calc_on_every_tick=false for historical backtests; only enable it knowingly for live/forward simulation, and document that results will differ.",
+          "rationale": "calc_on_every_tick changes intrabar evaluation and can repaint signals between history and realtime.",
+          "severity": "high"
+        },
+        {
+          "id": "bt-004",
+          "rule": "Require a minimum sample (target 100+ trades) before trusting metrics, and report trade count alongside net profit, profit factor, max drawdown, and average R.",
+          "rationale": "Small samples overfit; headline net profit without drawdown and trade count is meaningless.",
+          "severity": "high"
+        },
+        {
+          "id": "bt-005",
+          "rule": "Validate out-of-sample: reserve a hold-out period or use walk-forward, and reject parameter sets that only work on the in-sample window.",
+          "rationale": "Curve-fitting to one window is the most common reason live results diverge from backtests.",
+          "severity": "high"
+        },
+        {
+          "id": "bt-006",
+          "rule": "Use the FCPO contract multiplier (RM25/point) in default_qty / pyramiding settings so reported P&L is in real ringgit, and cap pyramiding deliberately.",
+          "rationale": "Default qty in contracts with the wrong multiplier misstates risk and reward.",
+          "severity": "medium"
+        },
+        {
+          "id": "bt-007",
+          "rule": "Constrain backtests to tradable sessions and exclude illiquid auction bars to avoid fills that are not achievable live.",
+          "rationale": "Backtests that fill in non-tradable windows overstate realizable edge.",
+          "severity": "medium"
+        }
+      ]
+    },
+
+    "alerts": {
+      "description": "Rules for building reliable, automation-ready alerts (including JSON payloads for webhook/MCP-driven workflows).",
+      "rules": [
+        {
+          "id": "alr-001",
+          "rule": "Fire alerts only on confirmed bars: gate alert()/strategy alerts with barstate.isconfirmed or use alert.freq_once_per_bar_close.",
+          "rationale": "Intrabar alerts repaint and produce duplicate/false notifications.",
+          "severity": "critical",
+          "example": "if longSignal and barstate.isconfirmed\n    alert(\"FCPO LONG\", alert.freq_once_per_bar_close)"
+        },
+        {
+          "id": "alr-002",
+          "rule": "Build alert messages as structured strings that include symbol, timeframe, side, price, and reason; for automation use a JSON payload with str.tostring().",
+          "rationale": "Downstream MCP/webhook consumers need machine-parseable context, not free text.",
+          "severity": "high",
+          "example": "msg = '{\"sym\":\"' + syminfo.ticker + '\",\"tf\":\"' + timeframe.period + '\",\"side\":\"long\",\"px\":' + str.tostring(close) + '}'"
+        },
+        {
+          "id": "alr-003",
+          "rule": "Use alertcondition() for simple static indicator alerts and the alert() function for dynamic, data-driven messages; do not mix both for the same event.",
+          "rationale": "alertcondition has a fixed message; alert() allows runtime content. Mixing duplicates alerts.",
+          "severity": "medium"
+        },
+        {
+          "id": "alr-004",
+          "rule": "De-duplicate: track the last alerted bar/condition in a var and suppress repeats while the condition stays true.",
+          "rationale": "Prevents alert storms when a condition remains true across bars.",
+          "severity": "medium"
+        },
+        {
+          "id": "alr-005",
+          "rule": "Never place sensitive credentials or webhook secrets inside Pine alert messages.",
+          "rationale": "Alert text can be logged and shared; secrets belong in the webhook receiver, not the script.",
+          "severity": "high"
+        }
+      ]
+    },
+
+    "risk_management": {
+      "description": "Position sizing and capital-protection rules, generalized from the v1 scalper risk block and adapted for FCPO/futures.",
+      "rules": [
+        {
+          "id": "risk-001",
+          "rule": "Risk a fixed fraction of equity per trade (default 1%); derive lot size from (equity * risk%) / (stop-distance * tick value), not from a fixed lot count.",
+          "rationale": "Constant fractional risk normalizes exposure across volatility regimes.",
+          "severity": "critical",
+          "example": "lots = math.floor((equity * 0.01) / (math.abs(entry - stop) * 25))"
+        },
+        {
+          "id": "risk-002",
+          "rule": "Always define stop and target before entry; reject any setup whose reward:risk is below the configured minimum (default 1.5R).",
+          "rationale": "Edge requires positive expectancy; sub-threshold R:R erodes it even at high win rate.",
+          "severity": "high"
+        },
+        {
+          "id": "risk-003",
+          "rule": "Enforce a daily loss limit and a max-trades-per-session cap (v1 used max 6 trades/run); halt new entries once hit.",
+          "rationale": "Caps tilt and limits damage during adverse regimes.",
+          "severity": "high"
+        },
+        {
+          "id": "risk-004",
+          "rule": "Place stops at structural invalidation (below Spring/support for longs, above UTAD/resistance for shorts), then size to that distance — never widen the stop to fit a desired size.",
+          "rationale": "Stops follow structure; size follows stops. Reversing this is how accounts blow up.",
+          "severity": "critical"
+        },
+        {
+          "id": "risk-005",
+          "rule": "For time-based scalps (v1 model), treat the time exit as the stop and still cap per-trade and per-run notional explicitly.",
+          "rationale": "A time-based exit without a notional cap leaves tail risk on gaps.",
+          "severity": "medium"
+        }
+      ]
+    },
+
+    "mcp_tools": {
+      "description": "Best practices for driving the TradingView MCP (read/control a live chart, develop Pine Script, manage alerts) from an AI assistant. Tool names refer to the tradingview MCP server.",
+      "rules": [
+        {
+          "id": "mcp-001",
+          "rule": "Call chart_get_state first in any session to learn the current symbol, timeframe, and the names + entity IDs of visible indicators before acting.",
+          "rationale": "Most other tools need the symbol/timeframe/indicator context; acting blind causes wrong-target edits.",
+          "severity": "high"
+        },
+        {
+          "id": "mcp-002",
+          "rule": "Use full indicator names with chart_manage_indicator (e.g., \"Relative Strength Index\", not \"RSI\"; \"Moving Average Exponential\", not \"EMA\").",
+          "rationale": "The MCP matches official study names; abbreviations fail to resolve.",
+          "severity": "high"
+        },
+        {
+          "id": "mcp-003",
+          "rule": "Always pass summary=true to data_get_ohlcv unless individual bars are strictly required.",
+          "rationale": "Full bar dumps are large and slow; summaries answer most questions.",
+          "severity": "medium"
+        },
+        {
+          "id": "mcp-004",
+          "rule": "Read live indicator values with data_get_study_values; read custom Pine drawings with data_get_pine_lines/labels/tables/boxes and always pass study_filter to target one indicator by name.",
+          "rationale": "Without study_filter the tools return everything and are ambiguous; the indicator must also be visible on the chart.",
+          "severity": "high"
+        },
+        {
+          "id": "mcp-005",
+          "rule": "After pine_set_source, run pine_smart_compile, then pine_get_errors (and pine_get_console if needed) before relying on the script.",
+          "rationale": "Inject -> compile -> check-errors is the only safe edit loop; silent compile failures otherwise go unnoticed.",
+          "severity": "critical"
+        },
+        {
+          "id": "mcp-006",
+          "rule": "Avoid pine_get_source on large/complex scripts unless actually editing; it can return 200KB+ and waste context.",
+          "rationale": "The MCP guidance warns complex scripts return very large source.",
+          "severity": "medium"
+        },
+        {
+          "id": "mcp-007",
+          "rule": "When verifying an indicator visually, use capture_screenshot with an explicit region (full, chart, or strategy_tester).",
+          "rationale": "Targeted regions are faster and clearer than full captures for review.",
+          "severity": "low"
+        },
+        {
+          "id": "mcp-008",
+          "rule": "Test signal logic with the replay tools (replay_start -> replay_step -> replay_status -> replay_stop) before trusting it on live data; use batch_run to sweep multiple symbols/timeframes.",
+          "rationale": "Replay reproduces bar-by-bar evaluation and surfaces repainting; batch_run scales validation.",
+          "severity": "medium"
+        },
+        {
+          "id": "mcp-009",
+          "rule": "Treat alert_create/alert_list/alert_delete as the alert lifecycle; list before create to avoid duplicates and delete stale alerts.",
+          "rationale": "Orphaned alerts fire unexpectedly and clutter automation.",
+          "severity": "medium"
+        },
+        {
+          "id": "mcp-010",
+          "rule": "Do not auto-execute live orders or move funds from MCP/automation; surface signals and let the human place the trade.",
+          "rationale": "Safety: AI-driven execution on a live brokerage is out of scope and high-risk; the v1 project is explicitly a demo.",
+          "severity": "critical"
+        }
+      ]
+    }
+  },
+
+  "strategy_profiles": {
+    "description": "Named, reusable strategy configurations. The original v1 scalper is preserved here verbatim in intent so nothing from the source is lost.",
+    "ten_second_momentum_scalper": {
+      "name": "10-Second Momentum Scalper (v1 legacy, demo only)",
+      "watchlist": ["BTCUSDT"],
+      "default_timeframe": "1",
+      "sources": [
+        "Price momentum — buy if last close > previous close (green candle)",
+        "RSI filter — only trade when RSI is not at an extreme (30-70 range)"
+      ],
+      "entry_rules": {
+        "long": ["Last close > previous close by at least 0.05%", "RSI between 30 and 70", "Enter market buy immediately"],
+        "short": ["Last close < previous close by at least 0.05%", "RSI between 30 and 70", "Enter market sell immediately"]
+      },
+      "exit_rules": [
+        "Exit automatically after 10 seconds (next loop tick closes previous position)",
+        "No manual exit management — pure time-based scalp"
+      ],
+      "risk_rules": [
+        "Fixed trade size: 1% of portfolio per trade",
+        "Maximum trade size: $3.00",
+        "Maximum 6 trades per 60-second run",
+        "No stop loss — exit is time-based at next tick",
+        "Demo purposes only — minimum exchange order size may apply"
+      ],
+      "notes": "Demo strategy for a YouTube video. Runs 6 trades over 60 seconds, one every 10 seconds. Retained for reference; superseded by the Wyckoff/MTF FCPO methodology above for real analysis."
+    }
+  }
+}
