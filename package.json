@@ -24,8 +24,11 @@
   },
   "files": [
     "src/",
+    "rules.json",
     "rules.example.json",
     "examples/",
+    "docs/",
+    "CHANGELOG.md",
     "README.md",
     "LICENSE",
     "NOTICE",
