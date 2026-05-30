@@ -36,3 +36,6 @@ tmp/
 
 # Built Desktop Extension bundle (attach to Releases instead)
 *.mcpb
+
+# MCP Registry auth token
+.mcpregistry_token
