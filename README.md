@@ -38,9 +38,14 @@ This version turns the file into a reusable **development ruleset**: 64 actionab
 
 ```
 tradingview-mcp-thaqif/
-  rules.json      # the ruleset (load this as AI context)
-  README.md       # this file
-  CHANGELOG.md    # improvements over the v1 original
+  rules.json                    # the ruleset (load this as AI context)
+  README.md                     # this file
+  CHANGELOG.md                  # improvements over the v1 original
+  LICENSE                       # MIT
+  .gitignore
+  examples/
+    fcpo_wyckoff_mtf.pine       # starter Pine v6 indicator that obeys these rules
+    README.md                   # what the example demonstrates
 ```
 
 ### Rule format
@@ -145,6 +150,14 @@ And `mcp-010`: surface signals, but never auto-execute live orders or move funds
 
 ---
 
+## Examples
+
+[`examples/fcpo_wyckoff_mtf.pine`](examples/fcpo_wyckoff_mtf.pine) is a starter Pine v6 indicator that puts the ruleset into practice on FCPO. It defines a trading range, detects Wyckoff **Spring** and **UTAD** events with climactic-volume confirmation, filters by a non-repainting higher-timeframe EMA bias, gates signals to Bursa FCPO session hours, derives ATR-based protective stops, emits confirmed-bar JSON alerts for webhook/MCP automation, and prints a status table the MCP can read. Every block in the script header cites the rule IDs it satisfies.
+
+Validate it against a live chart with the TradingView MCP using the `mcp-005` loop: `pine_set_source` -> `pine_smart_compile` -> `pine_get_errors`. See [`examples/README.md`](examples/README.md) for details.
+
+---
+
 ## My usage context
 
 These rules are tuned to how I actually trade and build:
@@ -174,3 +187,9 @@ These rules are tuned to how I actually trade and build:
 Based on the `rules.json` concept from [`LewisWJackson/tradingview-mcp-jackson`](https://github.com/LewisWJackson/tradingview-mcp-jackson). The legacy 10-second scalper config originates there and is retained for reference.
 
 This repository is for research and educational use. Nothing here is financial advice. Trading FCPO, crude oil, and crypto futures involves substantial risk of loss. The `mcp_tools` rules deliberately forbid AI-driven live execution — surface signals and place trades yourself.
+
+---
+
+## License
+
+Released under the [MIT License](LICENSE). Copyright (c) 2026 Thaqif (TZ24cloud).

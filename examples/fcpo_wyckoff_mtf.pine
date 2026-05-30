@@ -1,0 +1,125 @@
+//@version=6
+// =============================================================================
+// FCPO Wyckoff MTF Range Scanner - starter example
+// Repo:   tradingview-mcp-thaqif
+// Author: Thaqif (TZ24cloud)
+//
+// A worked example that puts the repo ruleset into practice. Rule IDs are cited
+// inline so the script doubles as documentation:
+//   ps-001 version | ps-002 single declaration | ps-003 namespacing
+//   ps-004 typed inputs | ps-006 na guards | ps-009 / mtf-002 non-repaint HTF
+//   ind-002 / wyk-005 volume confirmation | ind-003 / risk-004 ATR stops
+//   wyk-002 Spring | wyk-003 UTAD | mtf-001 HTF bias alignment
+//   fcpo-001 session gating | alr-001 / alr-002 confirmed JSON alerts
+//   ps-012 titled plots | mcp-004 table output (read via data_get_pine_tables)
+//
+// EDUCATIONAL ONLY. Not financial advice. Surface signals; place trades
+// yourself (mcp-010). Validate with the TradingView MCP via the mcp-005 loop:
+//   pine_set_source -> pine_smart_compile -> pine_get_errors
+// =============================================================================
+
+indicator("FCPO Wyckoff MTF Range Scanner", shorttitle="FCPO Wyckoff", overlay=true, max_labels_count=500, max_lines_count=100)
+
+// -----------------------------------------------------------------------------
+// Inputs (ps-004: typed, grouped, with tooltips)
+// -----------------------------------------------------------------------------
+grpRange = "Range / Wyckoff"
+rangeLen = input.int(20, "Range lookback (bars)", minval=5, group=grpRange, tooltip="Window used to define support/resistance of the trading range (the cause).")
+volLen   = input.int(20, "Volume average length", minval=5, group=grpRange)
+volMult  = input.float(1.5, "Climactic volume x average", minval=1.0, step=0.1, group=grpRange, tooltip="Spring/UTAD must print volume above this multiple of the average (Effort vs Result, wyk-005).")
+
+grpHtf  = "Higher-timeframe bias (mtf-001)"
+htfTf   = input.timeframe("240", "HTF for bias", group=grpHtf, tooltip="Daily/H4 trend filter. Signals are only taken in the HTF direction.")
+emaFast = input.int(21, "HTF EMA fast", minval=2, group=grpHtf)
+emaSlow = input.int(50, "HTF EMA slow", minval=3, group=grpHtf)
+
+grpSess    = "FCPO session filter (fcpo-001)"
+useSession = input.bool(true, "Restrict signals to session hours", group=grpSess)
+sess       = input.session("1030-1230,1430-1800", "Session(s)", group=grpSess, tooltip="Bursa Malaysia FCPO day sessions; lunch break (12:30-14:30) excluded.")
+tz         = input.string("Asia/Kuala_Lumpur", "Session timezone", group=grpSess)
+
+grpRisk = "Risk (ind-003 / risk-004)"
+atrLen  = input.int(14, "ATR length", minval=2, group=grpRisk)
+atrMult = input.float(1.5, "ATR x for protective stop", minval=0.1, step=0.1, group=grpRisk)
+
+// -----------------------------------------------------------------------------
+// Range boundaries - use the PRIOR-bar window ([1]) so the current bar can
+// break it without leaking the current bar into its own boundary (ps-006).
+// -----------------------------------------------------------------------------
+res    = ta.highest(high, rangeLen)[1]
+sup    = ta.lowest(low,  rangeLen)[1]
+volAvg = ta.sma(volume, volLen)
+climVol = not na(volAvg) and volume > volAvg * volMult
+
+// -----------------------------------------------------------------------------
+// Non-repainting HTF bias (ps-009 / mtf-002): request the LAST CLOSED HTF value
+// using expr[1] with lookahead_on - no future leak, no repaint.
+// -----------------------------------------------------------------------------
+f_htf(_expr, _tf) => request.security(syminfo.tickerid, _tf, _expr[1], lookahead=barmerge.lookahead_on)
+htfDiff = f_htf(ta.ema(close, emaFast) - ta.ema(close, emaSlow), htfTf)
+htfUp = not na(htfDiff) and htfDiff > 0
+htfDn = not na(htfDiff) and htfDiff < 0
+
+// -----------------------------------------------------------------------------
+// Session gate (fcpo-001): time() returns na outside the configured session.
+// -----------------------------------------------------------------------------
+inSession = (not useSession) or (not na(time(timeframe.period, sess, tz)))
+
+// -----------------------------------------------------------------------------
+// Wyckoff events with volume confirmation (wyk-002 Spring, wyk-003 UTAD, wyk-005)
+//   Spring: false break BELOW support that closes back inside on climactic volume.
+//   UTAD  : false break ABOVE resistance that closes back inside on climactic volume.
+// -----------------------------------------------------------------------------
+spring = not na(sup) and low  < sup and close > sup and climVol
+utad   = not na(res) and high > res and close < res and climVol
+
+// Trade only in the direction of least resistance (mtf-001) and in session (fcpo-001)
+longSig  = spring and htfUp and inSession
+shortSig = utad   and htfDn and inSession
+
+// -----------------------------------------------------------------------------
+// Protective stops (ind-003 / risk-004): structural invalidation + ATR buffer.
+// Stops follow structure; size your position to this distance, never the reverse.
+// -----------------------------------------------------------------------------
+atr       = ta.atr(atrLen)
+longStop  = low  - atrMult * atr
+shortStop = high + atrMult * atr
+
+// -----------------------------------------------------------------------------
+// Plots (ps-012: every plot titled and addressable by data_get_study_values)
+// -----------------------------------------------------------------------------
+plot(sup, "Range Support",    color=color.new(color.teal, 0),   linewidth=1)
+plot(res, "Range Resistance", color=color.new(color.maroon, 0), linewidth=1)
+plotshape(longSig,  title="Spring Long",  style=shape.triangleup,   location=location.belowbar, color=color.new(color.green, 0), size=size.tiny)
+plotshape(shortSig, title="UTAD Short",   style=shape.triangledown, location=location.abovebar, color=color.new(color.red, 0),   size=size.tiny)
+barcolor(longSig ? color.green : shortSig ? color.red : na, title="Signal bar")
+
+// Event labels on CONFIRMED bars only (no repaint, alr-001 discipline)
+if longSig and barstate.isconfirmed
+    label.new(bar_index, low, "Spring\nLong " + str.tostring(close, format.mintick), style=label.style_label_up, color=color.new(color.green, 0), textcolor=color.white, size=size.small)
+if shortSig and barstate.isconfirmed
+    label.new(bar_index, high, "UTAD\nShort " + str.tostring(close, format.mintick), style=label.style_label_down, color=color.new(color.red, 0), textcolor=color.white, size=size.small)
+
+// -----------------------------------------------------------------------------
+// Alerts - confirmed bar, JSON payload for webhook / MCP automation (alr-001/002)
+// No secrets in the payload (alr-005).
+// -----------------------------------------------------------------------------
+if longSig and barstate.isconfirmed
+    alert('{"sym":"' + syminfo.ticker + '","tf":"' + timeframe.period + '","side":"long","event":"spring","px":' + str.tostring(close) + ',"stop":' + str.tostring(longStop) + '}', alert.freq_once_per_bar_close)
+if shortSig and barstate.isconfirmed
+    alert('{"sym":"' + syminfo.ticker + '","tf":"' + timeframe.period + '","side":"short","event":"utad","px":' + str.tostring(close) + ',"stop":' + str.tostring(shortStop) + '}', alert.freq_once_per_bar_close)
+
+// -----------------------------------------------------------------------------
+// Status dashboard (mcp-004: readable via data_get_pine_tables with study_filter)
+// -----------------------------------------------------------------------------
+var table dash = table.new(position.top_right, 2, 4, border_width=1, frame_width=1, frame_color=color.new(color.gray, 50))
+if barstate.islast
+    biasTxt = htfUp ? "Bullish" : htfDn ? "Bearish" : "Neutral"
+    table.cell(dash, 0, 0, "FCPO Wyckoff MTF", text_color=color.white, bgcolor=color.new(color.blue, 0))
+    table.cell(dash, 1, 0, "", bgcolor=color.new(color.blue, 0))
+    table.cell(dash, 0, 1, "HTF bias",  text_size=size.small)
+    table.cell(dash, 1, 1, biasTxt,     text_size=size.small)
+    table.cell(dash, 0, 2, "In session", text_size=size.small)
+    table.cell(dash, 1, 2, inSession ? "Yes" : "No", text_size=size.small)
+    table.cell(dash, 0, 3, "Range",     text_size=size.small)
+    table.cell(dash, 1, 3, str.tostring(sup, format.mintick) + " - " + str.tostring(res, format.mintick), text_size=size.small)
