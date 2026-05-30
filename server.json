@@ -1,0 +1,21 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-09-29/server.schema.json",
+  "name": "io.github.TZ24cloud/tradingview-mcp-thaqif",
+  "description": "TradingView Desktop bridge for Pine Script v5/v6, FCPO/futures, and Wyckoff multi-timeframe analysis (local stdio MCP server).",
+  "version": "2.0.0",
+  "repository": {
+    "url": "https://github.com/TZ24cloud/tradingview-mcp-thaqif",
+    "source": "github"
+  },
+  "websiteUrl": "https://github.com/TZ24cloud/tradingview-mcp-thaqif#readme",
+  "packages": [
+    {
+      "registryType": "npm",
+      "identifier": "tradingview-mcp-thaqif",
+      "version": "2.0.0",
+      "transport": {
+        "type": "stdio"
+      }
+    }
+  ]
+}

@@ -1,6 +1,8 @@
 MIT License
 
-Copyright (c) 2026 Thaqif (TZ24cloud)
+Copyright (c) 2026 tradesdontlie (original author of tradingview-mcp)
+Copyright (c) 2026 Lewis W. Jackson (tradingview-mcp-jackson fork)
+Copyright (c) 2026 Thaqif / TZ24cloud (tradingview-mcp-thaqif fork)
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -22,6 +24,10 @@ SOFTWARE.
 
 ---
 
-NOTE: This repository contains educational trading-related rules and example
-Pine Script code. It is not financial advice. Trading FCPO, crude oil, and
-crypto futures involves substantial risk of loss. Use at your own risk.
+ADDITIONAL NOTICE: This software is not affiliated with, endorsed by, or
+associated with TradingView Inc. or Anthropic, PBC. Users are solely
+responsible for ensuring their use complies with TradingView's Terms of Use
+and all applicable laws. This license applies to the source code of this
+project only and does not grant any rights to TradingView's or Anthropic's
+software, data, trademarks, logos, or intellectual property. All such marks
+are the property of their respective owners.

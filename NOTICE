@@ -1,0 +1,39 @@
+tradingview-mcp-thaqif
+======================
+
+This product is a derivative work distributed under the MIT License.
+
+Attribution chain
+-----------------
+1. Original project: tradingview-mcp
+   Author : @tradesdontlie
+   Source : https://github.com/tradesdontlie/tradingview-mcp
+   License: MIT
+
+2. Intermediate fork: tradingview-mcp-jackson
+   Author : Lewis W. Jackson (@LewisWJackson)
+   Source : https://github.com/LewisWJackson/tradingview-mcp-jackson
+   License: MIT
+   Adds   : morning_brief workflow, session save/get, rules.json config,
+            tv_launch fix for TradingView Desktop v2.14+, tv CLI.
+
+3. This fork: tradingview-mcp-thaqif
+   Author : Thaqif (@TZ24cloud)
+   Source : https://github.com/TZ24cloud/tradingview-mcp-thaqif
+   License: MIT
+   Adds   : expanded rules.json v2.0.0 ruleset (Pine v5/v6, FCPO/Wyckoff,
+            multi-timeframe, backtesting, alerts, MCP-tool best practices),
+            example Pine indicator, packaging for npm + Claude .mcpb.
+
+Third-party dependencies
+------------------------
+- @modelcontextprotocol/sdk  (MIT)   - MCP server framework
+- chrome-remote-interface    (MIT)   - Chrome DevTools Protocol client
+- dotenv                     (BSD-2) - environment configuration
+
+Trademarks
+----------
+"TradingView" is a trademark of TradingView, Inc. "Claude" and "Anthropic"
+are trademarks of Anthropic, PBC. This project is not affiliated with,
+endorsed by, or sponsored by either company. All marks belong to their
+respective owners.

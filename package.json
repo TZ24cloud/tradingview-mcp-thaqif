@@ -1,0 +1,62 @@
+{
+  "name": "tradingview-mcp-thaqif",
+  "version": "2.0.0",
+  "description": "MCP server bridging TradingView Desktop (via Chrome DevTools Protocol) for Pine Script v5/v6 development, FCPO/futures analysis, and Wyckoff multi-timeframe workflows. Improved MIT fork with an expanded rules engine.",
+  "type": "module",
+  "license": "MIT",
+  "author": "Thaqif (TZ24cloud)",
+  "homepage": "https://github.com/TZ24cloud/tradingview-mcp-thaqif#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/TZ24cloud/tradingview-mcp-thaqif.git"
+  },
+  "bugs": {
+    "url": "https://github.com/TZ24cloud/tradingview-mcp-thaqif/issues"
+  },
+  "main": "src/server.js",
+  "bin": {
+    "tradingview-mcp-thaqif": "src/server.js",
+    "tv": "src/cli/index.js"
+  },
+  "exports": {
+    ".": "./src/server.js",
+    "./core": "./src/core/index.js"
+  },
+  "files": [
+    "src/",
+    "rules.example.json",
+    "examples/",
+    "README.md",
+    "LICENSE",
+    "NOTICE",
+    "SECURITY.md"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "modelcontextprotocol",
+    "tradingview",
+    "pine-script",
+    "fcpo",
+    "crude-palm-oil",
+    "futures",
+    "trading",
+    "wyckoff",
+    "claude",
+    "chrome-devtools-protocol"
+  ],
+  "scripts": {
+    "start": "node src/server.js",
+    "tv": "node src/cli/index.js",
+    "test": "node --test tests/e2e.test.js tests/pine_analyze.test.js",
+    "test:all": "node --test tests/e2e.test.js tests/pine_analyze.test.js tests/cli.test.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.1",
+    "chrome-remote-interface": "^0.33.2",
+    "dotenv": "^17.4.1"
+  }
+}

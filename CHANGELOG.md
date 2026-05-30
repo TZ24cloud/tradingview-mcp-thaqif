@@ -27,6 +27,9 @@ Complete restructure from a single-strategy config into a reusable Pine Script /
 - **`strategy_profiles` block** — named, reusable strategy configs.
 - **README.md** — overview, MCP integration steps, category reference table with code examples, usage context, and a customization guide.
 - **CHANGELOG.md** — this file.
+- **Server bundled (fork assembly)** — the MIT TradingView MCP server (Chrome DevTools Protocol bridge to TradingView Desktop) is now included (`src/`, `scripts/`, `tests/`), making this repo an installable MCP, not just a ruleset.
+- **Packaging & distribution** — npm metadata for `npx` install, a Claude Desktop `.mcpb` manifest (`manifest.json`), an official MCP Registry entry (`server.json`), plus `NOTICE`, `SECURITY.md`, and a `DISTRIBUTION.md` launch checklist.
+- **docs/RULESET.md** — the detailed ruleset guide, relocated from the original README (which is now the server's front page).
 
 ### Changed
 
