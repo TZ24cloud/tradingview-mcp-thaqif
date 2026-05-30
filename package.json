@@ -1,6 +1,7 @@
 {
   "name": "tradingview-mcp-thaqif",
-  "version": "2.0.0",
+  "version": "2.0.1",
+  "mcpName": "io.github.TZ24cloud/tradingview-mcp-thaqif",
   "description": "MCP server bridging TradingView Desktop (via Chrome DevTools Protocol) for Pine Script v5/v6 development, FCPO/futures analysis, and Wyckoff multi-timeframe workflows. Improved MIT fork with an expanded rules engine.",
   "type": "module",
   "license": "MIT",
